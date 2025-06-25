@@ -1,0 +1,93 @@
+---
+title: "proto_tesis"
+author: "Alfredo Aro y Romina Loayza"
+date: "2025-06-25"
+output: html_document
+---
+
+# Contrataciones públicas 2019
+
+## Traemos la data
+
+```{r}
+contratos = read.csv("https://raw.githubusercontent.com/alfredoaroterleira/proto_tesis/refs/heads/main/data_expo.csv")
+head(contratos)
+```
+
+```{r}
+library(dplyr)
+
+contratos = contratos %>%
+  select("departamento", "empresa_1", "empresa_2", "empresa_3", "empresa_4", "empresa_5")
+
+str(contratos)
+```
+
+```{r}
+contratos$empresa_1 = as.character(contratos$empresa_1)
+contratos$empresa_2 = as.character(contratos$empresa_2)
+contratos$empresa_3 = as.character(contratos$empresa_3)
+contratos$empresa_4 = as.character(contratos$empresa_4)
+contratos$empresa_5 = as.character(contratos$empresa_5)
+
+str(contratos)
+```
+
+
+```{r}
+#lo pasamos a formato long
+
+library(tidyverse)
+
+# Supongamos que tu data se llama 'contratos'
+contratos_long <- contratos %>%
+  pivot_longer(cols = starts_with("empresa"), 
+               names_to = "empresa_num", 
+               values_to = "empresa") %>%
+  filter(!is.na(empresa))  # eliminar filas vacías
+
+head(contratos_long)
+```
+
+```{r}
+#creamos red bipartita
+
+# Peso = cantidad de contratos que la empresa tiene con el distrito
+red_bipartita <- contratos_long %>%
+  count(departamento, empresa, name = "peso")
+
+# Guardar como CSV
+write.csv(red_bipartita, "red_bipartita_empresa_distrito.csv", row.names = FALSE)
+
+
+```
+
+
+```{r}
+library(tidyverse)
+
+# Partimos de contratos_long, que ya está en formato largo
+# (columnas: distrito, empresa)
+
+# 1. Agrupar por contrato (distrito) y crear combinaciones solo si hay al menos 2 empresas
+red_unipartita <- contratos_long %>%
+  group_by(departamento) %>%
+  summarise(pares = list({
+    empresas <- unique(empresa)
+    if (length(empresas) >= 2) combn(empresas, 2, simplify = FALSE) else list()
+  }), .groups = "drop") %>%
+  unnest(pares) %>%
+  mutate(source = map_chr(pares, 1),
+         target = map_chr(pares, 2)) %>%
+  select(source, target)
+
+```
+
+```{r}
+red_unipartita_pesada <- red_unipartita %>%
+  count(source, target, name = "peso")
+
+write.csv(red_unipartita_pesada, "red_unipartita_empresas.csv", row.names = FALSE)
+
+```
+
